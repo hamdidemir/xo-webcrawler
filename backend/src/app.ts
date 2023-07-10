@@ -1,68 +1,37 @@
-import { UrlLoaderService, TextAndLinks } from './services/url-loader.service.js';
-import { Command } from 'commander';
+
+import { UrlLoaderService } from './services/url-loader.service.js'
+import { Command } from 'commander'
 
 interface AppParameters {
-  url: string;
-  word: string;
-  depth: number;
+  url: string
 }
 
-export const DEFAULT_URL = 'https://www.kayako.com/';
+export const DEFAULT_URL = 'https://www.kayako.com/'
 
 export class App {
-  private readonly command: Command;
-
-  constructor(private readonly urlLoader: UrlLoaderService) {
-    this.command = new Command();
+  /* istanbul ignore next */
+  constructor (private readonly urlLoader: UrlLoaderService, private readonly command = new Command()) {
   }
 
-  async run(): Promise<void> {
-    const appParameters = this.parseCli();
+  async run (): Promise<void> {
+    const appParameters = this.parseCli()
 
-    await this.process(appParameters);
+    await this.process(appParameters)
   }
 
-  private async process(appParameters: AppParameters): Promise<void> {
-    const { url, word, depth } = appParameters;
-    const visitedUrls: Set<string> = new Set();
-    const queue: { url: string; level: number }[] = [{ url, level: 0 }];
-    let count = 0;
-
-    while (queue.length > 0) {
-      const { url, level } = queue.shift()!;
-      if (visitedUrls.has(url)) continue;
-      visitedUrls.add(url);
-
-      const { text, links } = await this.urlLoader.loadUrlTextAndLinks(url, level);
-      const wordOccurrences = this.countWordOccurrences(word, text);
-      count += wordOccurrences;
-
-      console.log(`Scanned ${url} (Level ${level}), Found ${wordOccurrences} instances of '${word}'`);
-
-      if (level < depth) {
-        for (const link of links) {
-          queue.push({ url: link, level: level + 1 });
-        }
-      }
-    }
-
-    console.log(`Total instances of '${word}': ${count}`);
+  async process (appParameters: AppParameters): Promise<void> {
+    const extractedText = await this.urlLoader.loadUrlTextAndLinks(appParameters.url)
+    const count = (extractedText.text.toLocaleLowerCase().match(/kayako/ig) ?? []).length
+    console.log(`Found ${count} instances of 'kayako' in the body of the page`)
   }
 
-  private countWordOccurrences(word: string, text: string): number {
-    const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
-    return (text.match(wordRegex) || []).length;
-  }
-
-  parseCli(): AppParameters {
+  parseCli (argv: readonly string[] = process.argv): AppParameters {
     this.command
       .requiredOption('-u, --url <url>', 'URL to load', DEFAULT_URL)
-      .option('-w, --word <word>', 'Word to search', 'kayako')
-      .option('-d, --depth <depth>', 'Scan depth level', parseInt, 2);
 
-    this.command.parse(process.argv);
-    const options = this.command.opts();
+    this.command.parse(argv)
+    const options = this.command.opts()
 
-    return { url: options.url, word: options.word, depth: options.depth };
+    return { url: options.url }
   }
 }
